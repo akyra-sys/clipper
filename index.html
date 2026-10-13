@@ -1,0 +1,277 @@
+<!DOCTYPE html><html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"><title>YouTube Clip Extractor</title>
+
+<style>
+    body {
+        font-family: Arial, sans-serif;
+        background: #121212;
+        color: white;
+        padding: 15px;
+        margin: 0;
+    }
+
+    .container {
+        max-width: 500px;
+        margin: 20px auto;
+        background: #222;
+        padding: 18px;
+        border-radius: 12px;
+    }
+
+    h1 {
+        text-align: center;
+        font-size: 24px;
+    }
+
+    input, select, button {
+        width: 100%;
+        padding: 12px;
+        margin-top: 8px;
+        box-sizing: border-box;
+        border-radius: 6px;
+        border: none;
+    }
+
+    input, select {
+        background: #333;
+        color: white;
+    }
+
+    button {
+        background: #ff3333;
+        color: white;
+        font-weight: bold;
+        font-size: 15px;
+        cursor: pointer;
+    }
+
+    button:disabled {
+        background: #666;
+    }
+
+    label {
+        display: block;
+        margin-top: 16px;
+    }
+
+    video {
+        width: 100%;
+        margin-top: 15px;
+        background: black;
+        border-radius: 8px;
+    }
+
+    .note {
+        color: #bbb;
+        font-size: 13px;
+        line-height: 1.5;
+    }
+
+    a {
+        display: block;
+        margin-top: 15px;
+        overflow-wrap: anywhere;
+    }
+</style>
+
+</head><body>
+<div class="container"><h1>YouTube Clip Extractor</h1>
+
+<label for="videoUrl">YouTube URL</label>
+<input
+    id="videoUrl"
+    type="url"
+    placeholder="Paste YouTube link here"
+>
+
+<p class="note">
+    URL input is for reference only. Direct YouTube video
+    retrieval has not been implemented.
+</p>
+
+<label for="videoFile">Select a video file</label>
+<input
+    id="videoFile"
+    type="file"
+    accept="video/*"
+>
+
+<video id="player" controls playsinline></video>
+
+<p id="duration" class="note">
+    Video duration: Not loaded
+</p>
+
+<label for="startTime">Start time (seconds)</label>
+<input
+    id="startTime"
+    type="number"
+    min="0"
+    step="0.1"
+    value="0"
+>
+
+<label for="endTime">End time (seconds)</label>
+<input
+    id="endTime"
+    type="number"
+    min="0"
+    step="0.1"
+    value="10"
+>
+
+<button id="jumpButton" type="button">
+    Jump to Start
+</button>
+
+<button id="previewButton" type="button">
+    Preview Selected Segment
+</button>
+
+<label for="quality">Output Resolution</label>
+<select id="quality">
+    <option value="720">720p HD</option>
+    <option value="1080">1080p Full HD</option>
+    <option value="best">Highest Available</option>
+</select>
+
+<button id="exportButton" type="button">
+    Export MP4
+</button>
+
+<p id="result" class="note">
+    Select a video file to begin.
+</p>
+
+<p id="progress" class="note"></p>
+
+<a id="downloadLink" hidden download="clip.mp4">
+    Download Your Clip
+</a>
+
+</div><!-- FFmpeg library imports; processing is not implemented yet. --><script src="https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.js"></script><script src="https://cdn.jsdelivr.net/npm/@ffmpeg/util@0.12.2/dist/umd/index.js"></script><script>
+    const player = document.getElementById("player");
+    const fileInput = document.getElementById("videoFile");
+    const result = document.getElementById("result");
+    const downloadLink = document.getElementById("downloadLink");
+
+    let videoObjectUrl = null;
+    let previewTimer = null;
+
+    fileInput.addEventListener("change", function () {
+        const file = fileInput.files[0];
+
+        if (!file) return;
+
+        if (videoObjectUrl) {
+            URL.revokeObjectURL(videoObjectUrl);
+        }
+
+        videoObjectUrl = URL.createObjectURL(file);
+        player.src = videoObjectUrl;
+
+        downloadLink.hidden = true;
+
+        result.textContent = "Video loaded: " + file.name;
+    });
+
+    player.addEventListener("loadedmetadata", function () {
+        document.getElementById("duration").textContent =
+            "Video duration: " + player.duration.toFixed(2) + " seconds";
+
+        document.getElementById("endTime").value =
+            Math.floor(player.duration);
+    });
+
+    function getTimes() {
+        return {
+            start: Number(document.getElementById("startTime").value),
+            end: Number(document.getElementById("endTime").value)
+        };
+    }
+
+    function validTimes() {
+        const t = getTimes();
+
+        if (!player.src || !Number.isFinite(player.duration)) {
+            result.textContent = "Select a video file first.";
+            return false;
+        }
+
+        if (
+            !Number.isFinite(t.start) ||
+            !Number.isFinite(t.end) ||
+            t.start < 0 ||
+            t.end <= t.start ||
+            t.end > player.duration
+        ) {
+            result.textContent =
+                "Enter valid timestamps within the video duration.";
+            return false;
+        }
+
+        return true;
+    }
+
+    function jumpToStart() {
+        if (!validTimes()) return;
+
+        clearInterval(previewTimer);
+
+        player.currentTime = getTimes().start;
+        player.pause();
+
+        result.textContent = "Jumped to the selected start time.";
+    }
+
+    function previewClip() {
+        if (!validTimes()) return;
+
+        clearInterval(previewTimer);
+
+        const t = getTimes();
+
+        player.currentTime = t.start;
+
+        player.play().then(function () {
+            result.textContent = "Previewing selected segment.";
+
+            previewTimer = setInterval(function () {
+                if (player.currentTime >= t.end) {
+                    player.pause();
+                    clearInterval(previewTimer);
+                    result.textContent = "Segment preview finished.";
+                }
+            }, 100);
+
+        }).catch(function () {
+            result.textContent =
+                "Tap Play on the video player to begin previewing.";
+        });
+    }
+
+    function exportClip() {
+        if (!validTimes()) return;
+
+        const quality = document.getElementById("quality").value;
+
+        result.textContent =
+            "Export is not implemented yet. Selected segment: " +
+            (getTimes().end - getTimes().start).toFixed(2) +
+            " seconds. Selected resolution: " +
+            (quality === "best" ? "Highest Available" : quality + "p") +
+            ".";
+    }
+
+    document.getElementById("jumpButton")
+        .addEventListener("click", jumpToStart);
+
+    document.getElementById("previewButton")
+        .addEventListener("click", previewClip);
+
+    document.getElementById("exportButton")
+        .addEventListener("click", exportClip);
+</script></body>
+</html>

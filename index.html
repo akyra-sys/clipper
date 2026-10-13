@@ -1,277 +1,576 @@
-<!DOCTYPE html><html lang="en">
+<!DOCTYPE html>
+<html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0"><title>YouTube Clip Extractor</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>YouTube Clip Extractor</title>
 
-<style>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
     body {
-        font-family: Arial, sans-serif;
-        background: #121212;
-        color: white;
-        padding: 15px;
-        margin: 0;
+      margin: 0;
+      padding: 20px;
+      background: #101114;
+      color: #f5f5f5;
+      font-family: Arial, sans-serif;
     }
 
     .container {
-        max-width: 500px;
-        margin: 20px auto;
-        background: #222;
-        padding: 18px;
-        border-radius: 12px;
+      max-width: 650px;
+      margin: auto;
     }
 
     h1 {
-        text-align: center;
-        font-size: 24px;
+      text-align: center;
+      font-size: 26px;
     }
 
-    input, select, button {
-        width: 100%;
-        padding: 12px;
-        margin-top: 8px;
-        box-sizing: border-box;
-        border-radius: 6px;
-        border: none;
-    }
-
-    input, select {
-        background: #333;
-        color: white;
-    }
-
-    button {
-        background: #ff3333;
-        color: white;
-        font-weight: bold;
-        font-size: 15px;
-        cursor: pointer;
-    }
-
-    button:disabled {
-        background: #666;
+    .card {
+      background: #1d1f25;
+      padding: 18px;
+      border-radius: 12px;
+      margin: 16px 0;
     }
 
     label {
-        display: block;
-        margin-top: 16px;
+      display: block;
+      margin: 14px 0 6px;
+    }
+
+    input, button {
+      width: 100%;
+      padding: 12px;
+      border-radius: 8px;
+      border: 1px solid #444;
+      font-size: 16px;
+    }
+
+    input {
+      background: #292c33;
+      color: white;
+    }
+
+    button {
+      margin-top: 12px;
+      background: #ff3333;
+      color: white;
+      border: none;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    button:disabled {
+      background: #555;
+      cursor: not-allowed;
     }
 
     video {
-        width: 100%;
-        margin-top: 15px;
-        background: black;
-        border-radius: 8px;
+      display: block;
+      width: 100%;
+      margin-top: 14px;
+      background: black;
+      border-radius: 8px;
+    }
+
+    #youtubePlayer {
+      width: 100%;
+      margin-top: 14px;
+    }
+
+    #youtubePlayer iframe {
+      width: 100%;
+      aspect-ratio: 16 / 9;
+      border: 0;
+      border-radius: 8px;
+    }
+
+    #status {
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+      line-height: 1.5;
     }
 
     .note {
-        color: #bbb;
-        font-size: 13px;
-        line-height: 1.5;
+      color: #bbb;
+      font-size: 14px;
+      line-height: 1.5;
     }
 
     a {
-        display: block;
-        margin-top: 15px;
-        overflow-wrap: anywhere;
+      color: #8ab4ff;
     }
-</style>
+  </style>
+</head>
 
-</head><body>
-<div class="container"><h1>YouTube Clip Extractor</h1>
+<body>
+  <div class="container">
+    <h1>YouTube Clip Extractor</h1>
 
-<label for="videoUrl">YouTube URL</label>
-<input
-    id="videoUrl"
-    type="url"
-    placeholder="Paste YouTube link here"
->
+    <div class="card">
+      <h3>1. YouTube Video</h3>
 
-<p class="note">
-    URL input is for reference only. Direct YouTube video
-    retrieval has not been implemented.
-</p>
+      <label for="youtubeUrl">YouTube video link</label>
+      <input
+        type="url"
+        id="youtubeUrl"
+        placeholder="Paste YouTube URL here"
+      >
 
-<label for="videoFile">Select a video file</label>
-<input
-    id="videoFile"
-    type="file"
-    accept="video/*"
->
+      <button id="checkYoutubeButton">
+        Load YouTube Video
+      </button>
 
-<video id="player" controls playsinline></video>
+      <div id="youtubePlayer"></div>
 
-<p id="duration" class="note">
-    Video duration: Not loaded
-</p>
+      <p class="note">
+        YouTube videos play through the official embedded player.
+        Exporting YouTube videos as MP4 is not supported by this page.
+      </p>
+    </div>
 
-<label for="startTime">Start time (seconds)</label>
-<input
-    id="startTime"
-    type="number"
-    min="0"
-    step="0.1"
-    value="0"
->
+    <div class="card">
+      <h3>2. Local Video File</h3>
 
-<label for="endTime">End time (seconds)</label>
-<input
-    id="endTime"
-    type="number"
-    min="0"
-    step="0.1"
-    value="10"
->
+      <input type="file" id="videoFile" accept="video/*">
 
-<button id="jumpButton" type="button">
-    Jump to Start
-</button>
+      <video id="video" controls playsinline></video>
 
-<button id="previewButton" type="button">
-    Preview Selected Segment
-</button>
+      <p class="note">
+        Upload a video file from your device to export an MP4 clip.
+      </p>
+    </div>
 
-<label for="quality">Output Resolution</label>
-<select id="quality">
-    <option value="720">720p HD</option>
-    <option value="1080">1080p Full HD</option>
-    <option value="best">Highest Available</option>
-</select>
+    <div class="card">
+      <h3>3. Select Clip Times</h3>
 
-<button id="exportButton" type="button">
-    Export MP4
-</button>
+      <label for="startTime">Start time (seconds)</label>
+      <input
+        type="number"
+        id="startTime"
+        min="0"
+        step="0.1"
+        value="0"
+      >
 
-<p id="result" class="note">
-    Select a video file to begin.
-</p>
+      <label for="endTime">End time (seconds)</label>
+      <input
+        type="number"
+        id="endTime"
+        min="0"
+        step="0.1"
+        value="10"
+      >
 
-<p id="progress" class="note"></p>
+      <button id="jumpButton" disabled>
+        Jump to Start
+      </button>
 
-<a id="downloadLink" hidden download="clip.mp4">
-    Download Your Clip
-</a>
+      <button id="previewButton">
+        Preview Selected Segment
+      </button>
+    </div>
 
-</div><!-- FFmpeg library imports; processing is not implemented yet. --><script src="https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/dist/umd/ffmpeg.js"></script><script src="https://cdn.jsdelivr.net/npm/@ffmpeg/util@0.12.2/dist/umd/index.js"></script><script>
-    const player = document.getElementById("player");
-    const fileInput = document.getElementById("videoFile");
-    const result = document.getElementById("result");
-    const downloadLink = document.getElementById("downloadLink");
+    <div class="card">
+      <h3>4. Export MP4</h3>
 
-    let videoObjectUrl = null;
-    let previewTimer = null;
+      <button id="exportButton" disabled>
+        Export MP4
+      </button>
 
-    fileInput.addEventListener("change", function () {
-        const file = fileInput.files[0];
+      <p id="status">Paste a YouTube link or select a local video.</p>
+      <div id="downloadArea"></div>
+    </div>
+  </div>
 
-        if (!file) return;
+  <script type="module">
+    import { FFmpeg } from
+      "https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.10/dist/esm/index.js";
 
-        if (videoObjectUrl) {
-            URL.revokeObjectURL(videoObjectUrl);
-        }
+    import { toBlobURL } from
+      "https://cdn.jsdelivr.net/npm/@ffmpeg/util@0.12.2/dist/esm/index.js";
 
-        videoObjectUrl = URL.createObjectURL(file);
-        player.src = videoObjectUrl;
+    const $ = id => document.getElementById(id);
 
-        downloadLink.hidden = true;
+    const videoFile = $("videoFile");
+    const video = $("video");
+    const startInput = $("startTime");
+    const endInput = $("endTime");
+    const jumpButton = $("jumpButton");
+    const previewButton = $("previewButton");
+    const exportButton = $("exportButton");
+    const status = $("status");
+    const downloadArea = $("downloadArea");
+    const youtubeUrl = $("youtubeUrl");
 
-        result.textContent = "Video loaded: " + file.name;
-    });
+    const ffmpeg = new FFmpeg();
 
-    player.addEventListener("loadedmetadata", function () {
-        document.getElementById("duration").textContent =
-            "Video duration: " + player.duration.toFixed(2) + " seconds";
+    let selectedFile = null;
+    let videoURL = null;
+    let ffmpegLoaded = false;
+    let busy = false;
+    let youtubePlayer = null;
+    let youtubeVideoId = null;
+    let youtubeStopTimer = null;
+    let localStopHandler = null;
 
-        document.getElementById("endTime").value =
-            Math.floor(player.duration);
-    });
-
-    function getTimes() {
-        return {
-            start: Number(document.getElementById("startTime").value),
-            end: Number(document.getElementById("endTime").value)
-        };
+    function setStatus(message) {
+      status.textContent = message;
     }
 
-    function validTimes() {
-        const t = getTimes();
+    function extractYouTubeId(value) {
+      try {
+        const url = new URL(value.trim());
+        const host = url.hostname.toLowerCase().replace(/^www\./, "");
 
-        if (!player.src || !Number.isFinite(player.duration)) {
-            result.textContent = "Select a video file first.";
-            return false;
+        if (host === "youtu.be") {
+          return url.pathname.split("/").filter(Boolean)[0] || null;
         }
 
         if (
-            !Number.isFinite(t.start) ||
-            !Number.isFinite(t.end) ||
-            t.start < 0 ||
-            t.end <= t.start ||
-            t.end > player.duration
+          host === "youtube.com" ||
+          host === "m.youtube.com" ||
+          host === "youtube-nocookie.com"
         ) {
-            result.textContent =
-                "Enter valid timestamps within the video duration.";
-            return false;
+          if (url.pathname === "/watch") {
+            return url.searchParams.get("v");
+          }
+
+          const match = url.pathname.match(
+            /^\/(?:embed|shorts|live)\/([^/?]+)/
+          );
+
+          return match ? match[1] : null;
         }
 
-        return true;
+        return null;
+      } catch {
+        return null;
+      }
     }
 
-    function jumpToStart() {
-        if (!validTimes()) return;
+    function loadYouTubeAPI() {
+      if (window.YT && window.YT.Player) {
+        return Promise.resolve();
+      }
 
-        clearInterval(previewTimer);
+      return new Promise((resolve, reject) => {
+        const previousCallback = window.onYouTubeIframeAPIReady;
 
-        player.currentTime = getTimes().start;
-        player.pause();
+        window.onYouTubeIframeAPIReady = () => {
+          if (typeof previousCallback === "function") {
+            previousCallback();
+          }
+          resolve();
+        };
 
-        result.textContent = "Jumped to the selected start time.";
+        let script = document.querySelector(
+          'script[src="https://www.youtube.com/iframe_api"]'
+        );
+
+        if (!script) {
+          script = document.createElement("script");
+          script.src = "https://www.youtube.com/iframe_api";
+          script.onerror = () => {
+            reject(new Error("Could not load the YouTube player API."));
+          };
+          document.head.appendChild(script);
+        }
+      });
     }
 
-    function previewClip() {
-        if (!validTimes()) return;
+    $("checkYoutubeButton").addEventListener("click", async () => {
+      const id = extractYouTubeId(youtubeUrl.value);
 
-        clearInterval(previewTimer);
+      if (!id) {
+        setStatus("Enter a valid YouTube video link.");
+        return;
+      }
 
-        const t = getTimes();
+      try {
+        setStatus("Loading YouTube player...");
 
-        player.currentTime = t.start;
+        await loadYouTubeAPI();
 
-        player.play().then(function () {
-            result.textContent = "Previewing selected segment.";
+        if (youtubeStopTimer) {
+          clearInterval(youtubeStopTimer);
+          youtubeStopTimer = null;
+        }
 
-            previewTimer = setInterval(function () {
-                if (player.currentTime >= t.end) {
-                    player.pause();
-                    clearInterval(previewTimer);
-                    result.textContent = "Segment preview finished.";
-                }
-            }, 100);
+        if (youtubePlayer) {
+          youtubePlayer.destroy();
+          youtubePlayer = null;
+        }
 
-        }).catch(function () {
-            result.textContent =
-                "Tap Play on the video player to begin previewing.";
+        youtubeVideoId = id;
+        $("youtubePlayer").replaceChildren();
+
+        const playerElement = document.createElement("div");
+        playerElement.id = "youtubePlayerFrame";
+        $("youtubePlayer").appendChild(playerElement);
+
+        youtubePlayer = new YT.Player("youtubePlayerFrame", {
+          width: "100%",
+          videoId: id,
+          playerVars: {
+            playsinline: 1,
+            rel: 0
+          },
+          events: {
+            onReady: () => {
+              setStatus(
+                "YouTube video loaded. Set start and end times, " +
+                "then preview the segment."
+              );
+            },
+            onError: event => {
+              setStatus(
+                "YouTube could not play this video. It may be unavailable " +
+                "or restricted from embedding. Error: " + event.data
+              );
+            }
+          }
         });
+
+      } catch (error) {
+        setStatus(error.message);
+      }
+    });
+
+    function getTimes(duration = null) {
+      const start = Number(startInput.value);
+      const end = Number(endInput.value);
+
+      if (!Number.isFinite(start) || !Number.isFinite(end)) {
+        throw new Error("Enter valid start and end times.");
+      }
+
+      if (start < 0 || end <= start) {
+        throw new Error("End time must be greater than start time.");
+      }
+
+      if (duration && end > duration) {
+        throw new Error(
+          `End time exceeds video duration (${duration.toFixed(1)} seconds).`
+        );
+      }
+
+      return { start, end };
     }
 
-    function exportClip() {
-        if (!validTimes()) return;
+    videoFile.addEventListener("change", () => {
+      selectedFile = videoFile.files[0] || null;
+      downloadArea.replaceChildren();
 
-        const quality = document.getElementById("quality").value;
+      if (videoURL) {
+        URL.revokeObjectURL(videoURL);
+        videoURL = null;
+      }
 
-        result.textContent =
-            "Export is not implemented yet. Selected segment: " +
-            (getTimes().end - getTimes().start).toFixed(2) +
-            " seconds. Selected resolution: " +
-            (quality === "best" ? "Highest Available" : quality + "p") +
-            ".";
+      video.pause();
+      video.removeAttribute("src");
+      video.load();
+
+      if (!selectedFile) {
+        jumpButton.disabled = true;
+        exportButton.disabled = true;
+        setStatus("Choose a local video file.");
+        return;
+      }
+
+      videoURL = URL.createObjectURL(selectedFile);
+      video.src = videoURL;
+
+      video.onloadedmetadata = () => {
+        startInput.value = "0";
+        endInput.value = Math.min(10, video.duration).toFixed(1);
+
+        jumpButton.disabled = false;
+        exportButton.disabled = false;
+
+        setStatus(
+          `Local video loaded. Duration: ${video.duration.toFixed(2)} seconds.`
+        );
+      };
+
+      video.onerror = () => {
+        setStatus("The browser could not read this video file.");
+      };
+    });
+
+    jumpButton.addEventListener("click", () => {
+      try {
+        if (!video.src) {
+          setStatus("Jump to Start is available for local videos.");
+          return;
+        }
+
+        const { start } = getTimes(video.duration);
+        video.currentTime = start;
+        video.pause();
+      } catch (error) {
+        setStatus(error.message);
+      }
+    });
+
+    previewButton.addEventListener("click", async () => {
+      try {
+        const { start, end } = getTimes();
+
+        if (youtubePlayer && youtubeVideoId) {
+          const duration = youtubePlayer.getDuration();
+
+          if (duration > 0 && end > duration) {
+            throw new Error("End time exceeds the YouTube video duration.");
+          }
+
+          if (youtubeStopTimer) {
+            clearInterval(youtubeStopTimer);
+          }
+
+          youtubePlayer.seekTo(start, true);
+          youtubePlayer.playVideo();
+
+          youtubeStopTimer = setInterval(() => {
+            if (
+              youtubePlayer &&
+              youtubePlayer.getCurrentTime() >= end
+            ) {
+              youtubePlayer.pauseVideo();
+              clearInterval(youtubeStopTimer);
+              youtubeStopTimer = null;
+            }
+          }, 200);
+
+          setStatus(`Previewing YouTube segment: ${start}–${end} seconds.`);
+          return;
+        }
+
+        if (!video.src) {
+          throw new Error("Load a YouTube link or select a local video first.");
+        }
+
+        getTimes(video.duration);
+
+        if (localStopHandler) {
+          video.removeEventListener("timeupdate", localStopHandler);
+        }
+
+        video.currentTime = start;
+
+        localStopHandler = () => {
+          if (video.currentTime >= end) {
+            video.pause();
+            video.removeEventListener("timeupdate", localStopHandler);
+            localStopHandler = null;
+          }
+        };
+
+        video.addEventListener("timeupdate", localStopHandler);
+        await video.play();
+
+        setStatus(`Previewing local video: ${start}–${end} seconds.`);
+
+      } catch (error) {
+        setStatus(error.message);
+      }
+    });
+
+    async function loadFFmpeg() {
+      if (ffmpegLoaded) return;
+
+      setStatus("Loading FFmpeg engine...");
+
+      const baseURL =
+        "https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/umd";
+
+      await ffmpeg.load({
+        coreURL: await toBlobURL(
+          `${baseURL}/ffmpeg-core.js`,
+          "text/javascript"
+        ),
+        wasmURL: await toBlobURL(
+          `${baseURL}/ffmpeg-core.wasm`,
+          "application/wasm"
+        )
+      });
+
+      ffmpegLoaded = true;
     }
 
-    document.getElementById("jumpButton")
-        .addEventListener("click", jumpToStart);
+    exportButton.addEventListener("click", async () => {
+      if (busy || !selectedFile) {
+        setStatus("Select a local video file to export.");
+        return;
+      }
 
-    document.getElementById("previewButton")
-        .addEventListener("click", previewClip);
+      busy = true;
+      exportButton.disabled = true;
+      downloadArea.replaceChildren();
 
-    document.getElementById("exportButton")
-        .addEventListener("click", exportClip);
-</script></body>
+      try {
+        const { start, end } = getTimes(video.duration);
+
+        await loadFFmpeg();
+
+        setStatus("Reading video file...");
+
+        await ffmpeg.writeFile(
+          "input_video",
+          new Uint8Array(await selectedFile.arrayBuffer())
+        );
+
+        setStatus("Trimming and converting to MP4...");
+
+        const result = await ffmpeg.exec([
+          "-ss", String(start),
+          "-i", "input_video",
+          "-t", String(end - start),
+          "-map", "0:v:0?",
+          "-map", "0:a:0?",
+          "-c:v", "libx264",
+          "-preset", "ultrafast",
+          "-crf", "23",
+          "-c:a", "aac",
+          "-movflags", "+faststart",
+          "clip.mp4"
+        ]);
+
+        if (result !== 0) {
+          throw new Error("FFmpeg could not process this video.");
+        }
+
+        const output = await ffmpeg.readFile("clip.mp4");
+        const blob = new Blob([output], { type: "video/mp4" });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+
+        link.href = url;
+        link.download = "clip.mp4";
+        link.textContent = "Download MP4 Clip";
+        link.style.display = "block";
+        link.style.marginTop = "14px";
+
+        downloadArea.appendChild(link);
+        setStatus("Export complete.");
+
+        link.addEventListener("click", () => {
+          setTimeout(() => URL.revokeObjectURL(url), 60000);
+        }, { once: true });
+
+      } catch (error) {
+        console.error(error);
+        setStatus(
+          `Export failed: ${error.message}\n\n` +
+          "Try a smaller video or check your internet connection."
+        );
+      } finally {
+        busy = false;
+        exportButton.disabled = !selectedFile;
+      }
+    });
+  </script>
+</body>
 </html>

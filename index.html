@@ -1,11 +1,8 @@
-<!DOCTYPE html>
-<html lang="en">
+<!DOCTYPE html><html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>YouTube Clip Extractor</title>
-
-  <style>
+  <title>YouTube Clip Extractor</title>  <style>
     * {
       box-sizing: border-box;
     }
@@ -106,97 +103,106 @@
     a {
       color: #8ab4ff;
     }
-  </style>
-</head>
 
-<body>
+    .secondary-button {
+      background: #383c46;
+    }
+
+    .download-link {
+      display: block;
+      margin-top: 14px;
+      padding: 12px;
+      background: #292c33;
+      border-radius: 8px;
+      text-align: center;
+      color: #8ab4ff;
+      text-decoration: none;
+    }
+  </style></head><body>
   <div class="container">
-    <h1>YouTube Clip Extractor</h1>
+    <h1>YouTube Clip Extractor</h1><div class="card">
+  <h3>1. YouTube Video</h3>
 
-    <div class="card">
-      <h3>1. YouTube Video</h3>
+  <label for="youtubeUrl">YouTube video link</label>
 
-      <label for="youtubeUrl">YouTube video link</label>
+  <input
+    type="url"
+    id="youtubeUrl"
+    placeholder="Paste YouTube URL here"
+  >
 
-      <input
-        type="url"
-        id="youtubeUrl"
-        placeholder="Paste YouTube URL here"
-      >
+  <button id="checkYoutubeButton">
+    Load YouTube Video
+  </button>
 
-      <button id="checkYoutubeButton">
-        Load YouTube Video
-      </button>
+  <div id="youtubePlayer"></div>
 
-      <div id="youtubePlayer"></div>
+  <p class="note">
+    Load a YouTube video, select your timestamps, and export
+    the selected segment as an MP4. Only use videos you own
+    or have permission to download. Some videos may be unavailable
+    because of access restrictions.
+  </p>
+</div>
 
-      <p class="note">
-        Play YouTube videos using the official embedded player.
-        Exporting YouTube videos requires an uploaded video file
-        that you are authorized to use.
-      </p>
-    </div>
+<div class="card">
+  <h3>2. Local Video File</h3>
 
-    <div class="card">
-      <h3>2. Local Video File</h3>
+  <input type="file" id="videoFile" accept="video/*">
 
-      <input type="file" id="videoFile" accept="video/*">
+  <video id="video" controls playsinline></video>
 
-      <video id="video" controls playsinline></video>
+  <p class="note">
+    Alternatively, choose a video from your device.
+    Maximum upload size: 100 MB.
+  </p>
+</div>
 
-      <p class="note">
-        Choose a video from your device. The file will be uploaded
-        to the trimming server to create your MP4 clip.
-        Maximum upload size: 100 MB.
-      </p>
-    </div>
+<div class="card">
+  <h3>3. Select Clip Times</h3>
 
-    <div class="card">
-      <h3>3. Select Clip Times</h3>
+  <label for="startTime">Start time (seconds)</label>
 
-      <label for="startTime">Start time (seconds)</label>
+  <input
+    type="number"
+    id="startTime"
+    min="0"
+    step="0.1"
+    value="0"
+  >
 
-      <input
-        type="number"
-        id="startTime"
-        min="0"
-        step="0.1"
-        value="0"
-      >
+  <label for="endTime">End time (seconds)</label>
 
-      <label for="endTime">End time (seconds)</label>
+  <input
+    type="number"
+    id="endTime"
+    min="0"
+    step="0.1"
+    value="10"
+  >
 
-      <input
-        type="number"
-        id="endTime"
-        min="0"
-        step="0.1"
-        value="10"
-      >
+  <button id="jumpButton" disabled>
+    Jump to Start
+  </button>
 
-      <button id="jumpButton" disabled>
-        Jump to Start
-      </button>
+  <button id="previewButton" class="secondary-button">
+    Preview Selected Segment
+  </button>
+</div>
 
-      <button id="previewButton">
-        Preview Selected Segment
-      </button>
-    </div>
+<div class="card">
+  <h3>4. Export MP4</h3>
 
-    <div class="card">
-      <h3>4. Export MP4</h3>
+  <button id="exportButton" disabled>
+    Export MP4
+  </button>
 
-      <button id="exportButton" disabled>
-        Export MP4
-      </button>
+  <p id="status">Load a YouTube video or select a local video.</p>
 
-      <p id="status">Select a local video to begin.</p>
+  <div id="downloadArea"></div>
+</div>
 
-      <div id="downloadArea"></div>
-    </div>
-  </div>
-
-  <script>
+  </div>  <script>
     const API_URL =
       "https://youtube-clipper-backend-cy9k.onrender.com";
 
@@ -212,45 +218,86 @@
     const status = $("status");
     const downloadArea = $("downloadArea");
     const youtubeUrl = $("youtubeUrl");
+    const youtubeContainer = $("youtubePlayer");
 
     let selectedFile = null;
     let videoURL = null;
     let busy = false;
+
+    let sourceMode = null;
     let youtubePlayer = null;
     let youtubeVideoId = null;
     let youtubeStopTimer = null;
     let localStopHandler = null;
+    let youtubeReady = false;
+    let playerGeneration = 0;
 
     function setStatus(message) {
       status.textContent = message;
     }
 
+    function clearDownload() {
+      downloadArea.replaceChildren();
+    }
+
+    function clearPreviewTimers() {
+      if (youtubeStopTimer) {
+        clearInterval(youtubeStopTimer);
+        youtubeStopTimer = null;
+      }
+
+      if (localStopHandler) {
+        video.removeEventListener("timeupdate", localStopHandler);
+        localStopHandler = null;
+      }
+    }
+
+    function updateButtons() {
+      const hasSource =
+        sourceMode === "youtube"
+          ? Boolean(youtubeVideoId && youtubeReady)
+          : sourceMode === "local"
+            ? Boolean(selectedFile && video.readyState >= 1)
+            : false;
+
+      exportButton.disabled = busy || !hasSource;
+      jumpButton.disabled = busy || !hasSource;
+      videoFile.disabled = busy;
+      $("checkYoutubeButton").disabled = busy;
+    }
+
     function extractYouTubeId(value) {
       try {
         const url = new URL(value.trim());
-        const host = url.hostname.toLowerCase().replace(/^www\./, "");
+
+        const host = url.hostname
+          .toLowerCase()
+          .replace(/^www\./, "");
+
+        let id = null;
 
         if (host === "youtu.be") {
-          return url.pathname.split("/").filter(Boolean)[0] || null;
-        }
-
-        if (
+          id = url.pathname.split("/").filter(Boolean)[0] || null;
+        } else if (
           host === "youtube.com" ||
           host === "m.youtube.com" ||
-          host === "youtube-nocookie.com"
+          host === "youtube-nocookie.com" ||
+          host === "music.youtube.com"
         ) {
           if (url.pathname === "/watch") {
-            return url.searchParams.get("v");
+            id = url.searchParams.get("v");
+          } else {
+            const match = url.pathname.match(
+              /^\/(?:embed|shorts|live)\/([^/?]+)/
+            );
+
+            id = match ? match[1] : null;
           }
-
-          const match = url.pathname.match(
-            /^\/(?:embed|shorts|live)\/([^/?]+)/
-          );
-
-          return match ? match[1] : null;
         }
 
-        return null;
+        return id && /^[a-zA-Z0-9_-]{11}$/.test(id)
+          ? id
+          : null;
       } catch {
         return null;
       }
@@ -262,7 +309,15 @@
       }
 
       return new Promise((resolve, reject) => {
-        window.onYouTubeIframeAPIReady = resolve;
+        const previousCallback = window.onYouTubeIframeAPIReady;
+
+        window.onYouTubeIframeAPIReady = () => {
+          if (typeof previousCallback === "function") {
+            previousCallback();
+          }
+
+          resolve();
+        };
 
         let script = document.querySelector(
           'script[src="https://www.youtube.com/iframe_api"]'
@@ -281,63 +336,6 @@
       });
     }
 
-    $("checkYoutubeButton").addEventListener("click", async () => {
-      const id = extractYouTubeId(youtubeUrl.value);
-
-      if (!id) {
-        setStatus("Enter a valid YouTube video link.");
-        return;
-      }
-
-      try {
-        setStatus("Loading YouTube player...");
-
-        await loadYouTubeAPI();
-
-        if (youtubeStopTimer) {
-          clearInterval(youtubeStopTimer);
-          youtubeStopTimer = null;
-        }
-
-        if (youtubePlayer) {
-          youtubePlayer.destroy();
-          youtubePlayer = null;
-        }
-
-        youtubeVideoId = id;
-        $("youtubePlayer").replaceChildren();
-
-        const playerElement = document.createElement("div");
-        playerElement.id = "youtubePlayerFrame";
-        $("youtubePlayer").appendChild(playerElement);
-
-        youtubePlayer = new YT.Player("youtubePlayerFrame", {
-          width: "100%",
-          videoId: id,
-          playerVars: {
-            playsinline: 1,
-            rel: 0
-          },
-          events: {
-            onReady: () => {
-              setStatus(
-                "YouTube video loaded. Set the start and end times " +
-                "to preview a segment."
-              );
-            },
-            onError: event => {
-              setStatus(
-                "YouTube could not play this video. It may be unavailable " +
-                "or restricted from embedding. Error: " + event.data
-              );
-            }
-          }
-        });
-      } catch (error) {
-        setStatus(error.message);
-      }
-    });
-
     function getTimes(duration = null) {
       const start = Number(startInput.value);
       const end = Number(endInput.value);
@@ -352,7 +350,9 @@
       }
 
       if (start < 0 || end <= start) {
-        throw new Error("End time must be greater than start time.");
+        throw new Error(
+          "End time must be greater than start time."
+        );
       }
 
       if (duration !== null && end > duration) {
@@ -361,12 +361,129 @@
         );
       }
 
+      if (end - start > 600) {
+        throw new Error(
+          "The maximum clip duration is 600 seconds (10 minutes)."
+        );
+      }
+
       return { start, end };
     }
 
+    function getYouTubeDuration() {
+      if (!youtubePlayer || !youtubeReady) {
+        return null;
+      }
+
+      const duration = youtubePlayer.getDuration();
+
+      return Number.isFinite(duration) && duration > 0
+        ? duration
+        : null;
+    }
+
+    $("checkYoutubeButton").addEventListener("click", async () => {
+      if (busy) return;
+
+      const id = extractYouTubeId(youtubeUrl.value);
+
+      if (!id) {
+        setStatus("Enter a valid YouTube video URL.");
+        return;
+      }
+
+      clearPreviewTimers();
+      clearDownload();
+
+      sourceMode = null;
+      youtubeReady = false;
+      youtubeVideoId = null;
+
+      updateButtons();
+      setStatus("Loading YouTube player...");
+
+      const generation = ++playerGeneration;
+
+      try {
+        await loadYouTubeAPI();
+
+        if (generation !== playerGeneration) return;
+
+        if (youtubePlayer) {
+          youtubePlayer.destroy();
+          youtubePlayer = null;
+        }
+
+        youtubeContainer.replaceChildren();
+
+        const playerElement = document.createElement("div");
+        playerElement.id = "youtubePlayerFrame";
+        youtubeContainer.appendChild(playerElement);
+
+        youtubeVideoId = id;
+        sourceMode = "youtube";
+
+        youtubePlayer = new YT.Player("youtubePlayerFrame", {
+          width: "100%",
+          videoId: id,
+
+          playerVars: {
+            playsinline: 1,
+            rel: 0
+          },
+
+          events: {
+            onReady: event => {
+              if (generation !== playerGeneration) return;
+
+              youtubePlayer = event.target;
+              youtubeReady = true;
+              sourceMode = "youtube";
+
+              const duration = getYouTubeDuration();
+
+              startInput.value = "0";
+              endInput.value = duration !== null
+                ? Math.min(10, duration).toFixed(1)
+                : "10";
+
+              updateButtons();
+
+              setStatus(
+                "YouTube video loaded. Select the start and end times, " +
+                "then preview or export your clip."
+              );
+            },
+
+            onError: event => {
+              if (generation !== playerGeneration) return;
+
+              youtubeReady = false;
+              updateButtons();
+
+              setStatus(
+                "YouTube could not play this video. It may be unavailable " +
+                "or restricted from embedding. Error code: " + event.data
+              );
+            }
+          }
+        });
+
+      } catch (error) {
+        sourceMode = null;
+        youtubeReady = false;
+        updateButtons();
+        setStatus(error.message);
+      }
+    });
+
     videoFile.addEventListener("change", () => {
+      if (busy) return;
+
+      clearPreviewTimers();
+      clearDownload();
+
       selectedFile = videoFile.files[0] || null;
-      downloadArea.replaceChildren();
 
       if (videoURL) {
         URL.revokeObjectURL(videoURL);
@@ -377,54 +494,81 @@
       video.removeAttribute("src");
       video.load();
 
-      jumpButton.disabled = true;
-      exportButton.disabled = true;
+      sourceMode = null;
+      updateButtons();
 
       if (!selectedFile) {
-        setStatus("Choose a local video file.");
+        setStatus("Choose a local video file or load a YouTube video.");
         return;
       }
 
       if (selectedFile.size > 100 * 1024 * 1024) {
         selectedFile = null;
         videoFile.value = "";
+
         setStatus(
           "This video exceeds the 100 MB upload limit. Choose a smaller file."
         );
+
+        updateButtons();
         return;
       }
 
+      sourceMode = "local";
       videoURL = URL.createObjectURL(selectedFile);
       video.src = videoURL;
 
       video.onloadedmetadata = () => {
+        if (sourceMode !== "local") return;
+
         startInput.value = "0";
         endInput.value = Math.min(10, video.duration).toFixed(1);
 
-        jumpButton.disabled = false;
-        exportButton.disabled = false;
+        updateButtons();
 
         setStatus(
-          `Video loaded. Duration: ${video.duration.toFixed(2)} seconds.`
+          `Local video loaded. Duration: ${video.duration.toFixed(2)} seconds.`
         );
       };
 
       video.onerror = () => {
+        selectedFile = null;
+        sourceMode = null;
+        updateButtons();
+
         setStatus("The browser could not read this video file.");
       };
     });
 
     jumpButton.addEventListener("click", () => {
       try {
-        if (!video.src) {
-          setStatus("Select a local video first.");
+        if (sourceMode === "youtube" && youtubePlayer && youtubeReady) {
+          const { start, end } = getTimes(getYouTubeDuration());
+
+          clearPreviewTimers();
+          youtubePlayer.seekTo(start, true);
+          youtubePlayer.pauseVideo();
+
+          setStatus(
+            `YouTube player moved to ${start} seconds. Clip ends at ${end} seconds.`
+          );
+
           return;
         }
 
-        const { start } = getTimes(video.duration);
+        if (sourceMode === "local" && selectedFile) {
+          const { start } = getTimes(video.duration);
 
-        video.currentTime = start;
-        video.pause();
+          clearPreviewTimers();
+          video.currentTime = start;
+          video.pause();
+
+          setStatus(`Local video moved to ${start} seconds.`);
+          return;
+        }
+
+        setStatus("Load a YouTube video or select a local video first.");
+
       } catch (error) {
         setStatus(error.message);
       }
@@ -432,20 +576,11 @@
 
     previewButton.addEventListener("click", async () => {
       try {
-        const { start, end } = getTimes();
+        if (sourceMode === "youtube" && youtubePlayer && youtubeReady) {
+          const duration = getYouTubeDuration();
+          const { start, end } = getTimes(duration);
 
-        if (youtubePlayer && youtubeVideoId) {
-          const duration = youtubePlayer.getDuration();
-
-          if (duration > 0 && end > duration) {
-            throw new Error(
-              "End time exceeds the YouTube video duration."
-            );
-          }
-
-          if (youtubeStopTimer) {
-            clearInterval(youtubeStopTimer);
-          }
+          clearPreviewTimers();
 
           youtubePlayer.seekTo(start, true);
           youtubePlayer.playVideo();
@@ -453,148 +588,206 @@
           youtubeStopTimer = setInterval(() => {
             if (
               youtubePlayer &&
+              youtubeReady &&
               youtubePlayer.getCurrentTime() >= end
             ) {
               youtubePlayer.pauseVideo();
-              clearInterval(youtubeStopTimer);
-              youtubeStopTimer = null;
+              clearPreviewTimers();
             }
           }, 200);
 
           setStatus(
             `Previewing YouTube segment: ${start}–${end} seconds.`
           );
+
           return;
         }
 
-        if (!video.src) {
-          throw new Error(
-            "Load a YouTube link or select a local video first."
+        if (sourceMode === "local" && selectedFile) {
+          const { start, end } = getTimes(video.duration);
+
+          clearPreviewTimers();
+
+          video.currentTime = start;
+
+          localStopHandler = () => {
+            if (video.currentTime >= end) {
+              video.pause();
+              clearPreviewTimers();
+            }
+          };
+
+          video.addEventListener("timeupdate", localStopHandler);
+
+          await video.play();
+
+          setStatus(
+            `Previewing local video: ${start}–${end} seconds.`
           );
+
+          return;
         }
 
-        getTimes(video.duration);
-
-        if (localStopHandler) {
-          video.removeEventListener("timeupdate", localStopHandler);
-        }
-
-        video.currentTime = start;
-
-        localStopHandler = () => {
-          if (video.currentTime >= end) {
-            video.pause();
-            video.removeEventListener("timeupdate", localStopHandler);
-            localStopHandler = null;
-          }
-        };
-
-        video.addEventListener("timeupdate", localStopHandler);
-        await video.play();
-
-        setStatus(
-          `Previewing local video: ${start}–${end} seconds.`
+        throw new Error(
+          "Load a YouTube link or select a local video first."
         );
+
       } catch (error) {
         setStatus(error.message);
       }
     });
 
+    async function readServerError(response) {
+      try {
+        const data = await response.json();
+
+        if (data.error) {
+          return data.error;
+        }
+
+        if (data.message) {
+          return data.message;
+        }
+      } catch {
+        // The response may not contain JSON.
+      }
+
+      return `Server error (${response.status}).`;
+    }
+
+    async function downloadClip(response) {
+      const blob = await response.blob();
+
+      if (blob.size === 0) {
+        throw new Error("The server returned an empty video.");
+      }
+
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+
+      link.href = url;
+      link.download = "clip.mp4";
+      link.className = "download-link";
+      link.textContent = "Download MP4 Clip";
+
+      downloadArea.appendChild(link);
+
+      setStatus(
+        `Export complete! MP4 size: ${(blob.size / 1024 / 1024).toFixed(2)} MB.`
+      );
+
+      link.addEventListener("click", () => {
+        setTimeout(() => URL.revokeObjectURL(url), 60000);
+      }, { once: true });
+    }
+
     exportButton.addEventListener("click", async () => {
-      if (busy || !selectedFile) {
-        setStatus("Select a local video file to export.");
+      if (busy) return;
+
+      if (sourceMode !== "youtube" && sourceMode !== "local") {
+        setStatus("Load a YouTube video or select a local video first.");
         return;
       }
 
       busy = true;
-      exportButton.disabled = true;
-      videoFile.disabled = true;
-      downloadArea.replaceChildren();
+      clearDownload();
+      updateButtons();
 
       try {
-        const { start, end } = getTimes(video.duration);
-        const duration = end - start;
+        let start;
+        let end;
+        let response;
 
-        if (duration > 600) {
-          throw new Error(
-            "The maximum clip duration is 600 seconds (10 minutes)."
-          );
-        }
-
-        const formData = new FormData();
-        formData.append("video", selectedFile, selectedFile.name);
-        formData.append("start", String(start));
-        formData.append("end", String(end));
-
-        setStatus(
-          "Uploading video to the server. Please keep this page open..."
-        );
-
-        const response = await fetch(`${API_URL}/trim`, {
-          method: "POST",
-          body: formData
-        });
-
-        if (!response.ok) {
-          let message = `Server error (${response.status}).`;
-
-          try {
-            const data = await response.json();
-            if (data.error) {
-              message = data.error;
-            }
-          } catch {
-            // The server may return a non-JSON error response.
+        if (sourceMode === "youtube") {
+          if (!youtubeVideoId || !youtubeReady) {
+            throw new Error("Load a YouTube video first.");
           }
 
-          throw new Error(message);
+          const duration = getYouTubeDuration();
+          ({ start, end } = getTimes(duration));
+
+          const originalUrl = youtubeUrl.value.trim();
+
+          if (extractYouTubeId(originalUrl) !== youtubeVideoId) {
+            throw new Error(
+              "The YouTube URL changed. Load the video again before exporting."
+            );
+          }
+
+          setStatus(
+            "Downloading and processing the YouTube video. " +
+            "This may take a few minutes. Keep this page open..."
+          );
+
+          response = await fetch(`${API_URL}/trim-youtube`, {
+            method: "POST",
+
+            headers: {
+              "Content-Type": "application/json"
+            },
+
+            body: JSON.stringify({
+              url: originalUrl,
+              start: String(start),
+              end: String(end)
+            })
+          });
+
+        } else {
+          if (!selectedFile) {
+            throw new Error("Select a local video file first.");
+          }
+
+          ({ start, end } = getTimes(video.duration));
+
+          const formData = new FormData();
+
+          formData.append("video", selectedFile, selectedFile.name);
+          formData.append("start", String(start));
+          formData.append("end", String(end));
+
+          setStatus(
+            "Uploading and processing your local video. " +
+            "Keep this page open..."
+          );
+
+          response = await fetch(`${API_URL}/trim`, {
+            method: "POST",
+            body: formData
+          });
         }
 
-        setStatus("Video processed. Preparing MP4 download...");
-
-        const blob = await response.blob();
-
-        if (blob.size === 0) {
-          throw new Error("The server returned an empty video.");
+        if (!response.ok) {
+          throw new Error(await readServerError(response));
         }
 
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement("a");
+        setStatus("Processing finished. Preparing your MP4 download...");
 
-        link.href = url;
-        link.download = "clip.mp4";
-        link.textContent = "Download MP4 Clip";
-        link.style.display = "block";
-        link.style.marginTop = "14px";
-        link.style.padding = "12px";
-        link.style.background = "#292c33";
-        link.style.borderRadius = "8px";
-        link.style.textAlign = "center";
-
-        downloadArea.appendChild(link);
-
-        setStatus(
-          `Export complete! MP4 size: ${(blob.size / 1024 / 1024).toFixed(2)} MB.`
-        );
-
-        link.addEventListener("click", () => {
-          setTimeout(() => URL.revokeObjectURL(url), 60000);
-        }, { once: true });
+        await downloadClip(response);
 
       } catch (error) {
-        console.error(error);
+        console.error("Export error:", error);
 
         setStatus(
           `Export failed: ${error.message}\n\n` +
-          "Check your internet connection and try again. " +
-          "If the problem persists, the server may be unavailable."
+          "Check your internet connection and backend status. " +
+          "If the problem persists, check the Render logs."
         );
+
       } finally {
         busy = false;
-        videoFile.disabled = false;
-        exportButton.disabled = !selectedFile;
+        updateButtons();
       }
     });
-  </script>
-</body>
+
+    window.addEventListener("beforeunload", () => {
+      clearPreviewTimers();
+
+      if (videoURL) {
+        URL.revokeObjectURL(videoURL);
+      }
+    });
+
+    updateButtons();
+  </script></body>
 </html>
